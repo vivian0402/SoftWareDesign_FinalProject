@@ -98,7 +98,6 @@ def evaluate(ypred, y_test, metric='auc', num_class=2, seed=123, bootstrap=False
     else:
         res = eval_fn(y_test, ypred, num_class)
         res_list.append(res)
-    # logging.info(f'Score========>{res_list}')
     return res_list
 
 def get_eval_metric_fn(eval_metric):

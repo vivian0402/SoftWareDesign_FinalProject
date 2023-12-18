@@ -30,12 +30,11 @@ def log_config(args):
     """
     dataset_name = args.data
     exp_dir = 'search_{}_{}'.format(dataset_name, time.strftime("%Y%m%d-%H%M%S"))
-    exp_log_dir = Path('fintune') / exp_dir
+    exp_log_dir = Path('SoftwareDesign_FinalProject/fintune') / exp_dir
     # save argss
     setattr(args, 'exp_log_dir', exp_log_dir)
 
-    if not os.path.exists(exp_log_dir):
-        os.mkdir(exp_log_dir)
+    os.makedirs(exp_log_dir, exist_ok=True)
     log_format = '%(asctime)s %(message)s'
     logging.basicConfig(stream=sys.stdout, level=logging.INFO,
                         format=log_format, datefmt='%m/%d %I:%M:%S %p')
@@ -53,8 +52,8 @@ _args = parse_args()
 log_config(_args)
 
 
-df = pd.read_csv('/home/gslu/task_data/task_data_new.csv')
-cpt = './mask_v5_0dot7/epoch_50_valloss_0.09760503503600243'
+df = pd.read_csv('/home/vivian/SoftwareDesign_FinalProject/task_dataset/task_data.csv')
+cpt = 'SoftwareDesign_FinalProject/CT-BERT-v1/CT-BERT-v1/CT-BERT-v1-CL'
 
 
 skf = StratifiedKFold(n_splits=5, random_state=42, shuffle=True)
@@ -65,7 +64,7 @@ for index, table_info in df.iterrows():
 
     logging.info(f'Start========>{task}_DataSet==========>')
     # table_file = '/home/gslu/CC18_meaning/data/' + task
-    table_file = '/home/gslu/task_data/data/' + task
+    table_file = '/home/vivian/SoftwareDesign_FinalProject/task_dataset/data/' + task
     X, y, cat_cols, num_cols, bin_cols = load_single_data_all(table_file, table_info['target'], auto_feature_type)
     X = X.reset_index(drop=True)
     y = y.reset_index(drop=True)
@@ -80,7 +79,7 @@ for index, table_info in df.iterrows():
     for trn_idx, val_idx in skf.split(X, y):
         CTBert.random_seed(42)
         idd += 1
-        cpt1 = f'./temp_models/checkpoint-finetune'
+        cpt1 = f'./SoftwareDesign_FinalProject/temp_models/checkpoint-finetune'
         train_data = X.loc[trn_idx]
         train_label = y[trn_idx]
         X_test = X.loc[val_idx]

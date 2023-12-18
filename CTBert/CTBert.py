@@ -5,7 +5,7 @@ from . import constants
 from .modeling_CTBert import CTBertClassifier, CTBertFeatureExtractor, CTBertFeatureProcessor, CTBertRegression
 from .modeling_CTBert import CTBertForCL, TableGPTForMask
 from .modeling_CTBert import CTBertInputEncoder, CTBertModel
-from .dataset_openml import load_openml_data, load_one_openml_data
+from .dataset_openml import load_openml_data
 from .evaluator import predict, evaluate
 from .trainer import Trainer
 from .trainer_ds import Trainer_ds

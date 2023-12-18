@@ -92,18 +92,6 @@ def load_single_classify_data(table_file, auto_feature_type, seed=42, coresize=1
                 sample_ratio = (coresize / X.shape[0])
                 X, _, y, _ = train_test_split(X, y, train_size=sample_ratio, random_state=seed, stratify=y, shuffle=True)
 
-            # if (X.shape[1] > 50):
-            #     forest = RandomForestClassifier()
-            #     forest.fit(X, y)
-            #     importances = forest.feature_importances_
-            #     cols = X.columns.tolist()
-            #     indices = np.argsort(importances)[::-1]
-            #     final_fe = []
-            #     for ix in indices[:fe_limit]:
-            #         final_fe.append(cols[ix])
-            #     # print(final_fe)
-            #     X = X[final_fe]
-
             y = LabelEncoder().fit_transform(y.values)
             y = pd.Series(y, index=X.index)
         else:
@@ -231,26 +219,26 @@ def load_all_data(label_data_path=None,
                 break
     
 
-    # for data in tqdm(unlabel_data_list, desc='load unlabel data'):
-    #     if data[-3:]=='csv':
-    #         data_path = unlabel_data_path + os.sep + data
+    for data in tqdm(unlabel_data_list, desc='load unlabel data'):
+        if data[-3:]=='csv':
+            data_path = unlabel_data_path + os.sep + data
         
-    #         try:
-    #             trainset, valset, cat_cols, num_cols, bin_cols = \
-    #             load_single_data(data_path, auto_feature_type=auto_feature_type, seed=seed, core_size=core_size)
-    #         except:
-    #             continue
+            try:
+                trainset, valset, cat_cols, num_cols, bin_cols = \
+                load_single_data(data_path, auto_feature_type=auto_feature_type, seed=seed, core_size=core_size)
+            except:
+                continue
 
-    #         unlabel_cnt += 1
-    #         num_col_list.append(num_cols)
-    #         cat_col_list.append(cat_cols)
-    #         bin_col_list.append(bin_cols)
-    #         train_list.append(trainset)
-    #         val_list.append(valset)
+            unlabel_cnt += 1
+            num_col_list.append(num_cols)
+            cat_col_list.append(cat_cols)
+            bin_col_list.append(bin_cols)
+            train_list.append(trainset)
+            val_list.append(valset)
             
-    #         # 快速测试用的，只用前100个数据集
-    #         if len(train_list) >= limit-1:
-    #             break
+            # 快速测试用的，只用前100个数据集
+            if len(train_list) >= limit-1:
+                break
 
     print(f'useful tab ===========> {len(train_list)}')
     print(f'label tab ===========> {label_cnt}')
@@ -280,9 +268,6 @@ def load_labeled_classify_data(label_data_path=None,
             except:
                 continue
 
-            # trainset, valset, cat_cols, num_cols, bin_cols = \
-            #     load_single_data(data_path, auto_feature_type=auto_feature_type, is_classify=True, seed=seed)
-
             num_col_list.append(num_cols)
             cat_col_list.append(cat_cols)
             bin_col_list.append(bin_cols)
@@ -301,8 +286,8 @@ if __name__ == '__main__':
     # load_labeled_classify_data('/home/gslu/small_clean_pretrain_data/clean_labeled_dataset')
     
     trainset, valset, cat_cols, num_cols, bin_cols = load_all_data(
-        label_data_path='/home/gslu/small_clean_pretrain_data/clean_labeled_dataset',
-        unlabel_data_path='/home/gslu/small_clean_pretrain_data/clean_unlabeled_dataset',
+        label_data_path='/home/vivian/SoftwareDesign_FinalProject/pretrain_dataset/data_label',
+        unlabel_data_path='/home/vivian/SoftwareDesign_FinalProject/pretrain_dataset/data_unlabel',
         limit=2000,
         core_size=10000,
     )

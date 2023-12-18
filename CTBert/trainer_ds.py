@@ -102,19 +102,6 @@ class Trainer_ds:
         
         logger.info(f'deepspeed dataload finish')
 
-        # if test_set_list is not None:
-        #     self.testloader_list = []
-        #     self.testsampler_list = []
-        #     for index, testset in enumerate(test_set_list):
-        #         test_data = TrainDataset((testset, index))
-        #         test_sampler = DistributedSampler(test_data)
-        #         self.testsampler_list.append(test_sampler)
-        #
-        #         testloader = DataLoader(test_data, collate_fn=self.collate_fn, batch_size=batch_size, sampler=test_sampler)
-        #         self.testloader_list.append(testloader)
-        # else:
-        #     self.testloader_list = None
-
         if test_set_list is not None:
             self.testloader_list = [
                 self._build_dataloader((testset,index), eval_batch_size, collator=self.collate_fn, shuffle=False) for index, testset in enumerate(test_set_list)
@@ -141,21 +128,11 @@ class Trainer_ds:
             self.create_scheduler(num_train_steps, self.optimizer)
 
         start_time = time.time()
-        # if self.model_engine.local_rank == 0:
-        #     eval_res_list = self.evaluate()
-        #     eval_res = np.mean(eval_res_list)
-        #     logger.info('epoch: {}, test {}: {:.6f}'.format(0, self.args['eval_metric_name'], eval_res))
         for epoch in trange(args['num_epoch'], desc='Epoch'):
             ite = 0
             train_loss_all = 0
-            # 对所有数据集
-            # self.model_engine.train()
             for dataindex in range(len(self.trainloader_list)):
-                # pre_loss = train_loss_all
-                # 对单个数据集的所有batch
-                # self.trainsampler_list[dataindex].set_epoch(epoch)
                 for data in self.trainloader_list[dataindex]:
-                    # self.optimizer.zero_grad()
                     data = list(data)
                     for key in data[0]:
                         if isinstance(data[0][key], list):
@@ -167,8 +144,6 @@ class Trainer_ds:
                     if data[1] is not None:
                         data[1] = torch.tensor(data[1].values).to(self.model_engine.local_rank)
                     logits, loss = self.model_engine(data[0], data[1], table_flag=dataindex)
-                    # if loss.item() == 0:
-                    #     continue
                     self.model_engine.backward(loss)
                     self.model_engine.step()
                     train_loss_all += loss.item()
@@ -176,11 +151,8 @@ class Trainer_ds:
                     if self.lr_scheduler is not None:
                         self.lr_scheduler.step()
 
-                # logger.info(f'epoch {epoch} + data {dataindex} : {train_loss_all-pre_loss} \n')
-
             
             if self.test_set_list is not None and (epoch+1)%10==0:
-            # if self.test_set_list is not None:
                 eval_res_list = self.evaluate()
                 eval_res = np.mean(eval_res_list)
                 logger.info('epoch: {}, test {}: {:.6f}'.format(epoch+1, self.args['eval_metric_name'], eval_res))
@@ -191,16 +163,6 @@ class Trainer_ds:
                 logger.info('epoch: {}, train loss: {:.4f}, lr: {:.6f}, spent: {:.1f} secs'.format(epoch+1, train_loss_all, self.optimizer.param_groups[0]['lr'], time.time()-start_time))
             
 
-        ########################################################################
-        #Save model#
-        # if self.model_engine.local_rank == 0:
-        #     if os.path.exists(self.output_dir):
-        #         if self.test_set_list is not None:
-        #             # load checkpoints
-        #             logger.info(f'load best at last from {self.output_dir}')
-        #             state_dict = torch.load(os.path.join(self.output_dir, constants.WEIGHTS_NAME), map_location='cpu')
-        #             self.model.load_state_dict(state_dict)
-        #         self.save_model(self.output_dir)
 
         logger.info('training complete, cost {:.1f} secs.'.format(time.time()-start_time))
     
@@ -210,7 +172,6 @@ class Trainer_ds:
         eval_res_list = []
         for dataindex in range(len(self.testloader_list)):
             y_test, pred_list, loss_list = [], [], []
-            # self.testsampler_list[dataindex].set_epoch(epoch)
             for data in self.testloader_list[dataindex]:
                 y_test.append(data[1])
                 with torch.no_grad():

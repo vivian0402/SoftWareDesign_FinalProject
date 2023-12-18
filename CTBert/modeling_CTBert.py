@@ -15,7 +15,6 @@ import torch.nn.functional as F
 import numpy as np
 import pandas as pd
 
-# from untils.corpus import Wikidata
 from . import constants
 dev = 'cuda'
 
@@ -36,23 +35,20 @@ class CTBertWordEmbedding(nn.Module):
         use_bert=True,
         ) -> None:
         super().__init__()
-        word2vec_weight = torch.load('./CTBert/bert_emb.pt')
+        word2vec_weight = torch.load('/home/vivian/SoftwareDesign_FinalProject/CTBert/bert_emb.pt')
         self.word_embeddings_header = nn.Embedding.from_pretrained(word2vec_weight, freeze=vocab_freeze, padding_idx=padding_idx)
         self.word_embeddings_value = nn.Embedding(vocab_size, vocab_dim, padding_idx)
         nn_init.kaiming_normal_(self.word_embeddings_value.weight)
 
         self.norm_header = nn.LayerNorm(vocab_dim, eps=layer_norm_eps)
-        weight_emb = torch.load('./CTBert/bert_layernorm_weight.pt')
-        bias_emb = torch.load('./CTBert/bert_layernorm_bias.pt')
+        weight_emb = torch.load('/home/vivian/SoftwareDesign_FinalProject/CTBert/bert_layernorm_weight.pt')
+        bias_emb = torch.load('/home/vivian/SoftwareDesign_FinalProject/CTBert/bert_layernorm_bias.pt')
         self.norm_header.weight.data.copy_(weight_emb)
         self.norm_header.bias.data.copy_(bias_emb)
         if vocab_freeze:
             freeze(self.norm_header)
         self.norm_value = nn.LayerNorm(vocab_dim, eps=layer_norm_eps)
-        
-        # self.word_embeddings = nn.Embedding(vocab_size, hidden_dim, padding_idx)
-        # nn_init.kaiming_normal_(self.word_embeddings.weight)
-        # self.norm = nn.LayerNorm(hidden_dim, eps=layer_norm_eps)
+
 
         self.dropout = nn.Dropout(hidden_dropout_prob)
 
@@ -91,11 +87,11 @@ class CTBertFeatureExtractor:
         ignore_duplicate_cols=False,
         **kwargs,
         ) -> None:
-        if os.path.exists('./CTBert/tokenizer'):
-            self.tokenizer = BertTokenizerFast.from_pretrained('./CTBert/tokenizer')
+        if os.path.exists('./SoftwareDesign_FinalProject/CTBert/tokenizer'):
+            self.tokenizer = BertTokenizerFast.from_pretrained('./SoftwareDesign_FinalProject/CTBert/tokenizer')
         else:
             self.tokenizer = BertTokenizerFast.from_pretrained('bert-base-uncased')
-            self.tokenizer.save_pretrained('./CTBert/tokenizer')
+            self.tokenizer.save_pretrained('./SoftwareDesign_FinalProject/CTBert/tokenizer')
         self.tokenizer.__dict__['model_max_length'] = 512
         if disable_tokenizer_parallel: # disable tokenizer parallel
             os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -140,13 +136,6 @@ class CTBertFeatureExtractor:
             # take all columns as categorical columns!
             cat_cols = col_names
 
-        # if shuffle:
-        #     np.random.shuffle(cat_cols)
-        #     np.random.shuffle(num_cols)
-        #     np.random.shuffle(bin_cols)
-
-        # prompt
-        # wiki = Wikidata()
 
         # TODO:
         # mask out NaN values like done in binary columns
@@ -235,27 +224,14 @@ class CTBertFeatureExtractor:
         '''update cat/num/bin column maps.
         '''
         if cat is not None:
-            # self.categorical_columns.extend(cat)
-            # self.categorical_columns = list(set(self.categorical_columns))
             self.categorical_columns = cat
 
         if num is not None:
-            # self.numerical_columns.extend(num)
-            # self.numerical_columns = list(set(self.numerical_columns))
             self.numerical_columns = num
 
         if bin is not None:
-            # self.binary_columns.extend(bin)
-            # self.binary_columns = list(set(self.binary_columns))
             self.binary_columns = bin
 
-        # col_no_overlap, duplicate_cols = self._check_column_overlap(self.categorical_columns, self.numerical_columns, self.binary_columns)
-        # if not self.ignore_duplicate_cols:
-        #     for col in duplicate_cols:
-        #         logger.error(f'Find duplicate cols named `{col}`, please process the raw data or set `ignore_duplicate_cols` to True!')
-        #     assert col_no_overlap, 'The assigned categorical_columns, numerical_columns, binary_columns should not have overlap! Please check your input.'
-        # else:
-        #     self._solve_duplicate_cols(duplicate_cols)
 
     def _check_column_overlap(self, cat_cols=None, num_cols=None, bin_cols=None):
         all_cols = []
@@ -306,12 +282,6 @@ class CTBertFeatureProcessor(nn.Module):
             use_bert=use_bert,
         )
         self.num_embedding = CTBertNumEmbedding(vocab_dim)
-
-        # self.num_embedding = CTBertNumEmbedding(hidden_dim)
-        # self.fc = nn.Linear(2*vocab_dim, vocab_dim)
-        # self.add_cls = CTBertCLSToken(hidden_dim=vocab_dim)
-        # self.self_attn = nn.MultiheadAttention(embed_dim=vocab_dim, num_heads=2, batch_first=True)
-        # self.align_layer = nn.Linear(hidden_dim, hidden_dim, bias=False)
 
         self.align_layer = nn.Linear(vocab_dim, hidden_dim, bias=False)
         
@@ -504,8 +474,6 @@ class CTBertFeatureProcessor(nn.Module):
             emb_list += [num_feat_embedding]
             att_mask_list += [torch.ones(num_feat_embedding.shape[0], num_feat_embedding.shape[1]).to(self.device)]
 
-            # emb_list += [num_feat_embedding]
-            # att_mask_list += [num_att_mask]
         if cat_feat_embedding is not None:
             col_emb += [cat_col_emb]
             emb_list += [cat_feat_embedding]
@@ -930,7 +898,6 @@ class CTBertClassifier(CTBertModel):
         )
         self.num_class = num_class
         self.clf = CTBertLinearClassifier(num_class=num_class, hidden_dim=hidden_dim)
-        # self.fused = nn.Linear(hidden_dim * 2, hidden_dim)
         if self.num_class > 2:
             self.loss_fn = nn.CrossEntropyLoss(reduction='none')
         else:
@@ -942,23 +909,11 @@ class CTBertClassifier(CTBertModel):
         if isinstance(x, dict):
             # input is the pre-tokenized encoded inputs
             inputs = x
-            # encoder_output2 = self.input_encoder2(x['x_num'])
         elif isinstance(x, pd.DataFrame):
             # input is dataframe
             inputs = self.input_encoder.feature_extractor(x, table_flag=table_flag)
-            # encoder_output2 = self.input_encoder2(inputs['x_num'])
         else:
             raise ValueError(f'CTBertClassifier takes inputs with dict or pd.DataFrame, find {type(x)}.')
-
-        # embeded = self.input_encoder(x)
-        # encoder_output2 = self.input_encoder2(x)
-        # embeded = self.cls_token(**embeded)
-        # # go through transformers, get final cls embedding
-        # encoder_output = self.encoder(**embeded)
-        # # get cls token
-        # modality1 = encoder_output[:, 0, :]
-        # modality2 = encoder_output2
-        # fused_modality = (modality1 + modality2) / 2
 
 
 
@@ -970,11 +925,6 @@ class CTBertClassifier(CTBertModel):
 
         # go through transformers, get the first cls embedding
         encoder_output = self.encoder(**outputs) # bs, seqlen+1, hidden_dim
-        # modality1 = encoder_output[:, 0, :]
-        # modality2 = encoder_output2
-        # fused_modality = (modality1 + modality2) / 2
-        # temp = torch.cat([modality1, modality2], 1)
-        # fused_modality = self.fused(temp)
 
         # classifier
         logits = self.clf(encoder_output)
@@ -1115,9 +1065,7 @@ class CTBertForCL(CTBertModel):
         # do positive sampling
         feat_x_list = []
         if isinstance(x, pd.DataFrame):
-            # print("x:",x)
             sub_x_list = self._build_positive_pairs(x, self.num_partition)
-            # print("sub_x_list:", sub_x_list)
             for sub_x in sub_x_list:
                 # encode two subset feature samples
                 feat_x = self.input_encoder(sub_x)
@@ -1127,9 +1075,6 @@ class CTBertForCL(CTBertModel):
                 feat_x_proj = self.projection_head(feat_x_proj) # bs, projection_dim
                 feat_x_list.append(feat_x_proj)
         elif isinstance(x, dict):
-            # pretokenized inputs
-            # logging.info(f"x:{x}")
-            # logging.info(f"sub_x_list:{x['input_sub_x']}")
             for input_x in x['input_sub_x']:
                 feat_x,_ = self.input_encoder.feature_processor(**input_x)
                 feat_x = self.cls_token(**feat_x)
@@ -1398,10 +1343,6 @@ class TableGPTForMask(CTBertModel):
         return masked_indices.int().to(self.device)
 
     def cal_mask_num_features_loss(self, output_emb, masked_indices, x_num):
-        # output_emb [bs, len, 1]
-        # x_num [bs, len] 
-
-        # input_emb_norm = self._norm(input_emb_copy)
         
         if masked_indices.bool().any():
             output_emb_norm = self.minmax_norm(output_emb)
@@ -1413,8 +1354,6 @@ class TableGPTForMask(CTBertModel):
         return loss
     
     def cal_mask_cat_features_loss(self, output_emb, masked_indices, cat_value_emb):
-        # output_emb [bs, len, dim]
-        # cat_value_emb  [bs, len, dim]
 
         if masked_indices.bool().any():
             cosine_distance = 1-F.cosine_similarity(output_emb[masked_indices.bool()], cat_value_emb[masked_indices.bool()], dim=-1)
@@ -1430,12 +1369,6 @@ class TableGPTForMask(CTBertModel):
         # calculate 余弦距离
         cosine_distance = 1-F.cosine_similarity(input_emb_copy, output_emb, dim=-1)
         loss = torch.mean(cosine_distance[masked_indices.bool()])
-
-        # MSE loss
-        # input_emb_norm = self._norm(input_emb_copy)
-        # output_emb_norm = self._norm(output_emb)
-        # loss = self.loss_fn(output_emb_norm[masked_indices.bool()], input_emb_norm[masked_indices.bool()])
-
         return loss
     
     def _norm(self, emb, eps=1e-12):

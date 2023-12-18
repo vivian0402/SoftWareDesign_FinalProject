@@ -105,10 +105,6 @@ class Trainer:
             num_train_steps = args['num_training_steps']
             logger.info(f'set warmup training in initial {num_train_steps} steps')
             self.create_scheduler(num_train_steps, self.optimizer)
-        
-        # eval_res_list = self.evaluate()
-        # eval_res = np.mean(eval_res_list)
-        # logger.info('epoch: {}, test {}: {:.6f}'.format(0, self.args['eval_metric_name'], eval_res))
 
         start_time = time.time()
         for epoch in trange(args['num_epoch'], desc='Epoch'):
@@ -121,8 +117,6 @@ class Trainer:
                 # 对单个数据集的所有batch
                 for data in self.trainloader_list[dataindex]:
                     self.optimizer.zero_grad()
-                    # if dataindex==1:
-                    #     print('hh')
                     
                     for key in data[0]:
                         if isinstance(data[0][key], list):
@@ -134,7 +128,6 @@ class Trainer:
                     if data[1] is not None:
                         data[1] = torch.tensor(data[1].values).to(self.device)
                     logits, loss = self.model(data[0], data[1], table_flag=dataindex)
-                    # print(f'{dataindex} :::: {loss.item()}')
                     loss.backward()
                     self.optimizer.step()
                     train_loss_all += loss.item()
@@ -143,7 +136,6 @@ class Trainer:
                         self.lr_scheduler.step()
 
             if self.test_set_list is not None and epoch%5==0:
-            # if self.test_set_list is not None:
                 eval_res_list = self.evaluate()
                 eval_res = np.mean(eval_res_list)
                 print('epoch: {}, test {}: {:.6f}'.format(epoch, self.args['eval_metric_name'], eval_res))
@@ -154,7 +146,6 @@ class Trainer:
                 logging.info('epoch: {}, train loss: {:.4f}, test {}: {:.6f}, lr: {:.6f}, spent: {:.1f} secs'.format(epoch, train_loss_all, self.args['eval_metric_name'], eval_res, self.optimizer.param_groups[0]['lr'], time.time()-start_time))
             else:
                 logging.info('epoch: {}, train loss: {:.4f}, lr: {:.6f}, spent: {:.1f} secs'.format(epoch, train_loss_all, self.optimizer.param_groups[0]['lr'], time.time()-start_time))
-            # self.save_epoch()
 
         if os.path.exists(self.output_dir):
             if self.test_set_list is not None:

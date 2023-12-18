@@ -17,7 +17,6 @@ from transformers.optimization import (
 )
 
 from .modeling_CTBert import CTBertFeatureExtractor
-# from .modeling_CTBert import CTBertFeatureExtractor_CL
 
 TYPE_TO_SCHEDULER_FUNCTION = {
     'linear': get_linear_schedule_with_warmup,
@@ -61,11 +60,6 @@ class TrainCollator:
             disable_tokenizer_parallel=True,
             ignore_duplicate_cols=ignore_duplicate_cols,
         )
-        # self.feature_preprocess = CTBertFeatureExtractor_CL(
-        #     categorical_columns=categorical_columns,
-        #     numerical_columns=numerical_columns,
-        #     binary_columns=binary_columns,
-        # )
     
     def save(self, path):
         self.feature_extractor.save(path)
@@ -127,14 +121,12 @@ class CTBertCollatorForCL(TrainCollator):
         table_flag = data[0][2]
         if self.num_partition > 1:
             sub_x_list = self._build_positive_pairs(df_x, self.num_partition)
-            # sub_x_list = self._build_positive_pairs_random(df_x, self.num_partition, table_flag=table_flag)
         else:
             sub_x_list = self._build_positive_pairs_single_view(df_x)
 
         input_x_list = []
         for sub_x in sub_x_list:
             inputs = self.feature_extractor(sub_x, table_flag=table_flag)
-            # inputs = self.feature_extractor.encoded_preprocess(sub_x)
             input_x_list.append(inputs)
         res = {'input_sub_x':input_x_list}
         return res, df_y
@@ -155,27 +147,11 @@ class CTBertCollatorForCL(TrainCollator):
                 sub_col = np.concatenate([sub_col, sub_col_list[i+1][:overlap]])
             elif overlap > 0 and i == n-1 and len_num_sub > 1:
                 sub_col = np.concatenate([sub_col, sub_col_list[i-1][-overlap:]])
-            # np.random.shuffle(sub_col)
             sub_x = x.copy()[sub_col]
             sub_x_list.append(sub_x)
             if len_num_sub == 1:
                 sub_x_list.append(sub_x)
         return sub_x_list
-
-        # x_cols = x.columns.tolist()
-        # sub_col_list = np.array_split(np.array(x_cols), n)
-        # len_cols = len(sub_col_list[0])
-        # overlap = int(math.ceil(len_cols * (self.overlap_ratio)))
-        # sub_x_list = []
-        # for i, sub_col in enumerate(sub_col_list):
-        #     if overlap > 0 and i < n-1:
-        #         sub_col = np.concatenate([sub_col, sub_col_list[i+1][:overlap]])
-        #     elif overlap >0 and i == n-1:
-        #         sub_col = np.concatenate([sub_col, sub_col_list[i-1][-overlap:]])
-        #     # np.random.shuffle(sub_col)
-        #     sub_x = x.copy()[sub_col]
-        #     sub_x_list.append(sub_x)
-        # return sub_x_list
     
     def _build_positive_pairs_random(self, x, n, table_flag=0):
         '''
@@ -184,7 +160,6 @@ class CTBertCollatorForCL(TrainCollator):
         sub_x_list = []
         x_cols = x.columns.tolist()
         sub_cols_len = math.ceil(len(x_cols)/2*(1+self.overlap_ratio))
-        # sub_cols_len = min(sub_cols_len, len(x_cols))
         assert sub_cols_len<=len(x_cols)
         for _ in range(n):
             encoded_info = {

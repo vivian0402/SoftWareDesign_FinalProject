@@ -4,13 +4,9 @@ import os
 import shutil
 import sys
 import time
-import numpy as np
 from pathlib import Path
-from sklearn.model_selection import StratifiedKFold,KFold
-from sklearn.model_selection import train_test_split
 import CTBert
 import warnings
-from torchsummary import summary 
 
 
 from CTBert.load_pretrain_data import load_all_data
@@ -28,12 +24,11 @@ def log_config(args):
     """
     dataset_name = args.data
     exp_dir = 'search_{}_{}'.format(dataset_name, time.strftime("%Y%m%d-%H%M%S"))
-    exp_log_dir = Path('Log') / exp_dir
+    exp_log_dir = Path('SoftwareDesign_FinalProject/Log') / exp_dir
     # save argss
     setattr(args, 'exp_log_dir', exp_log_dir)
 
-    if not os.path.exists(exp_log_dir):
-        os.mkdir(exp_log_dir)
+    os.makedirs(exp_log_dir, exist_ok=True)
     log_format = '%(asctime)s %(message)s'
     logging.basicConfig(stream=sys.stdout, level=logging.INFO,
                         format=log_format, datefmt='%m/%d %I:%M:%S %p')
@@ -44,47 +39,23 @@ def log_config(args):
 def parse_args():
     parser = argparse.ArgumentParser(description='CT-BERT-mask-pretrain')
     parser.add_argument('--data', type=str, default="pretrain", help='task')
-    parser.add_argument("--local_rank", type=int, help="")
     args = parser.parse_args()
-    # # config.py ---> args's arri.
-    # search_dataset_info = OPENML_DATACONFIG[args.data]
-    # for key, value in search_dataset_info.items():
-    #     setattr(args, key, value)
     return args
 
 _args = parse_args()
 log_config(_args)
 logging.info(f'args : {_args}')
 ###############   choice dataset and device   ###################
-pretrain_dataset = [
-                'credit-g',
-                'credit-approval',
-                # 'dresses-sales',
-                # 'adult',
-                # 'cylinder-bands',
-                # 'telco-customer-churn',
-                # 'data/IO',
-                # 'data/IC',
-                # 'data/BM',
-                # 'data/ST',
-            ]
+
 cal_device = dev
-cpt = './checkpoint-pretrain-openml'
-# 10 datasets
-# Allset, cat_cols, num_cols, bin_cols = transtab.load_data(pretrain_dataset)
-# trainset = []
-# valset = []
-# for X, y in Allset:
-#     X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=0, stratify=y, shuffle=True)
-#     trainset.append((X_train, y_train))
-#     valset.append((X_val, y_val))
+cpt = './SoftwareDesign_FinalProject/checkpoint-pretrain-openml'
+
 
 
 # openml big datasets
-# allset, trainset, valset, cat_cols, num_cols, bin_cols = transtab.load_openml_data(limit=10)
 trainset, valset, cat_cols, num_cols, bin_cols = load_all_data(
-    label_data_path='/home/gslu/small_clean_pretrain_data/clean_labeled_dataset',
-    unlabel_data_path='/home/gslu/small_clean_pretrain_data/clean_unlabeled_dataset',
+    label_data_path='/home/vivian/SoftwareDesign_FinalProject/pretrain_dataset/data_label',
+    unlabel_data_path='/home/vivian/SoftwareDesign_FinalProject/pretrain_dataset/data_unlabel',
     limit=10,
 )
 
@@ -103,13 +74,8 @@ model = CTBert.build_mask_features_learner(
     num_attention_head=model_arg['num_attention_head'],
     num_layer=model_arg['num_layer'],
     vocab_freeze=True,
-
-    # hidden_dim=768,
-    # ffn_dim=1536,
-    # projection_dim=256,
 )
-# total_params = sum(p.numel() for p in model.parameters())
-# summary(model.encoder, input_size=[(100, 128), (100,)])
+
 training_arguments = {
     'num_epoch': 500,
     'batch_size':256,

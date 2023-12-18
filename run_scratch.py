@@ -8,7 +8,7 @@ import pandas as pd
 import sys
 import time
 from pathlib import Path
-from sklearn.model_selection import StratifiedKFold,KFold
+from sklearn.model_selection import StratifiedKFold
 from sklearn.model_selection import train_test_split
 from CTBert.dataset_openml import load_single_data_all, Feature_type_recognition
 
@@ -30,12 +30,11 @@ def log_config(args):
     """
     dataset_name = args.log_name
     exp_dir = 'search_{}_{}'.format(dataset_name, time.strftime("%Y%m%d-%H%M%S"))
-    exp_log_dir = Path('Log') / exp_dir
+    exp_log_dir = Path('SoftwareDesign_FinalProject/Log') / exp_dir
     # save argss
     setattr(args, 'exp_log_dir', exp_log_dir)
 
-    if not os.path.exists(exp_log_dir):
-        os.mkdir(exp_log_dir)
+    os.makedirs(exp_log_dir, exist_ok=True)
     log_format = '%(asctime)s %(message)s'
     logging.basicConfig(stream=sys.stdout, level=logging.INFO,
                         format=log_format, datefmt='%m/%d %I:%M:%S %p')
@@ -46,8 +45,8 @@ def log_config(args):
 def parse_args():
     parser = argparse.ArgumentParser(description='CT-BERT-sup-scratch')
     parser.add_argument('--log_name', type=str, default="Sup", help='task')
-    parser.add_argument('--data_info', type=str, default='/home/gslu/task_data/task_data.csv', help='data info')
-    parser.add_argument('--dataset', type=str, default='/home/gslu/task_data/data/', help='data_file')
+    parser.add_argument('--data_info', type=str, default='/home/vivian/SoftwareDesign_FinalProject/task_dataset/task_data.csv', help='data info')
+    parser.add_argument('--dataset', type=str, default='/home/vivian/SoftwareDesign_FinalProject/task_dataset/data/', help='data_file')
     args = parser.parse_args()
     return args
 
@@ -79,7 +78,7 @@ for index, table_info in df.iterrows():
     for trn_idx, val_idx in skf.split(X, y):
         CTBert.random_seed(42)
         idd += 1
-        cpt = f'./temp_models/checkpoint-supervise'
+        cpt = f'./SoftwareDesign_FinalProject/temp_models/checkpoint-supervise'
         train_data = X.loc[trn_idx]
         train_label = y[trn_idx]
         X_test = X.loc[val_idx]
