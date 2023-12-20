@@ -87,11 +87,11 @@ class CTBertFeatureExtractor:
         ignore_duplicate_cols=False,
         **kwargs,
         ) -> None:
-        if os.path.exists('./SoftwareDesign_FinalProject/CTBert/tokenizer'):
-            self.tokenizer = BertTokenizerFast.from_pretrained('./SoftwareDesign_FinalProject/CTBert/tokenizer')
+        if os.path.exists('./save_info/CTBert/tokenizer'):
+            self.tokenizer = BertTokenizerFast.from_pretrained('./save_info/CTBert/tokenizer')
         else:
             self.tokenizer = BertTokenizerFast.from_pretrained('bert-base-uncased')
-            self.tokenizer.save_pretrained('./SoftwareDesign_FinalProject/CTBert/tokenizer')
+            self.tokenizer.save_pretrained('./save_info/CTBert/tokenizer')
         self.tokenizer.__dict__['model_max_length'] = 512
         if disable_tokenizer_parallel: # disable tokenizer parallel
             os.environ["TOKENIZERS_PARALLELISM"] = "false"

@@ -1,0 +1,4 @@
+﻿id_openml,name,file_name,version,train_rows,train_cols,num_numeric,num_disperse,num_missvalue,target,mode
+31,credit-g,0017_credit-g.csv,1,1000,21,7,14,0,class,classify
+560,bodyfat,bodyfat.csv,1,252,15,15,0,0,class,regression
+40975,car,0737_car.csv,3,1728,7,0,7,0,class,classify

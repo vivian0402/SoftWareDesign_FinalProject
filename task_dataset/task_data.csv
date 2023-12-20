@@ -1,0 +1,2 @@
+﻿id_openml,name,file_name,version,train_rows,train_cols,num_numeric,num_disperse,num_missvalue,target,mode
+40994,climate-model-simulation-crashes,0745_climate-model-simulation-crashes.csv,4,540,21,20,1,0,outcome,classify
