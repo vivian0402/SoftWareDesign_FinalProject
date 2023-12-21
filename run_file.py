@@ -1,4 +1,3 @@
-import argparse
 import logging
 import os
 import sys
@@ -8,8 +7,7 @@ import CTBert
 import warnings
 import pandas as pd
 from sklearn.model_selection import StratifiedKFold
-from CTBert.dataset_openml import load_single_data_all, Feature_type_recognition
-from CTBert.load_pretrain_data import load_all_data, load_labeled_classify_data
+from CTBert.data_loader import DataLoader
 from sklearn.model_selection import train_test_split
 import shutil
 import numpy as np
@@ -23,7 +21,6 @@ class BaseRunFile:
         if self.args.task_data_info is not None:
             self.df = pd.read_csv(self.args.task_data_info)
         self.skf = StratifiedKFold(n_splits=5, random_state=42, shuffle=True)
-        self.auto_feature_type = Feature_type_recognition()
         self.checkpoint_save = f'./save_info/temp_models/{self.args.checkpoint_save}'
         self.task_type = args.task_type
         self.model_type = args.model_type
@@ -85,9 +82,16 @@ class PretrainCLDeepSeed(BaseRunFile):
             return
         else:
             try:
-                trainset, valset, cat_cols, num_cols, bin_cols = load_labeled_classify_data(label_data_path=self.args.pretrain_label_dataset)
+                data_loader = DataLoader(
+                    task_type=self.args.task_type,
+                    label_data_path=self.args.pretrain_label_dataset,
+                    limit=10,
+                    is_classify=True
+                )
+                trainset, valset, cat_cols, num_cols, bin_cols = data_loader.create_loader()
             except Exception as e:
                 print(f"An error occurred while loading data: {e}")
+                return
 
         logging.info(self.model_arg)
 
@@ -148,11 +152,13 @@ class PretrainMaskDeepSeed(BaseRunFile):
             return
         else:
             try:
-                trainset, valset, cat_cols, num_cols, bin_cols = load_all_data(
+                data_loader = DataLoader(
+                    task_type=self.args.task_type,
                     label_data_path=self.args.pretrain_label_dataset,
                     unlabel_data_path=self.args.pretrain_unlabel_dataset,
                     limit=10,
                 )
+                trainset, valset, cat_cols, num_cols, bin_cols = data_loader.create_loader()
             except Exception as e:
                 print(f"An error occurred while loading data: {e}")
         
@@ -198,14 +204,16 @@ class PretrainMask(BaseRunFile):
             return
         else:
             try:
-                trainset, valset, cat_cols, num_cols, bin_cols = load_all_data(
+                data_loader = DataLoader(
+                    task_type=self.args.task_type,
                     label_data_path=self.args.pretrain_label_dataset,
                     unlabel_data_path=self.args.pretrain_unlabel_dataset,
                     limit=10,
                 )
+                trainset, valset, cat_cols, num_cols, bin_cols = data_loader.create_loader()
             except Exception as e:
                 print(f"An error occurred while loading data: {e}")
-        
+                
         logging.info(self.model_arg)
 
         model = CTBert.build_mask_features_learner(
@@ -248,7 +256,12 @@ class Finetune(BaseRunFile):
 
             logging.info(f'Start========>{task}_DataSet==========>')
             table_file = self.args.task_dataset + task
-            X, y, cat_cols, num_cols, bin_cols = load_single_data_all(table_file, table_info['target'], self.auto_feature_type)
+            data_loader = DataLoader(
+                    task_type=self.args.task_type,
+                    task_target=table_info['target'],
+                    task_data_path=table_file
+                )
+            X, y, cat_cols, num_cols, bin_cols = data_loader.create_loader() 
             X = X.reset_index(drop=True)
             y = y.reset_index(drop=True)
 
@@ -322,7 +335,12 @@ class Scratch(BaseRunFile):
 
             logging.info(f'Start========>{task}_DataSet==========>')
             table_file = self.args.task_dataset + task
-            X, y, cat_cols, num_cols, bin_cols = load_single_data_all(table_file, table_info['target'], self.auto_feature_type)
+            data_loader = DataLoader(
+                    task_type=self.args.task_type,
+                    task_target=table_info['target'],
+                    task_data_path=table_file
+                )
+            X, y, cat_cols, num_cols, bin_cols = data_loader.create_loader() 
             X = X.reset_index(drop=True)
             y = y.reset_index(drop=True)
 
