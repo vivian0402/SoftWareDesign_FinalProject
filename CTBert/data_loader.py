@@ -30,15 +30,6 @@ class Feature_type_recognition():
             else:
                 raise RuntimeError('error feature type!')
         return self.cat, self.bin, self.num
-    
-    def check_class(self, data_path):
-        self.df = pd.read_csv(data_path)
-        
-        target_type = self.get_data_type(self.df.columns.tolist()[-1])
-        if target_type == 'cat':
-            return True
-        else:
-            return False
 
 class DataLoader:
     def __init__(self, is_classify = False, label_data_path = None, unlabel_data_path = None, 
@@ -71,7 +62,7 @@ class DataLoader:
             )
         else:
             raise ValueError(f"Unsupported task type: {self.task_type}")
-        return loader.process_data()
+        return loader.run()
     
     def read_file(self, file):
         if os.path.exists(file):
@@ -187,7 +178,7 @@ class LoadPretrainAllData(DataLoader):
                     break
         return num_col_list, cat_col_list, bin_col_list, train_list, val_list, cnt
 
-    def process_data(self):
+    def run(self):
         num_col_list, cat_col_list, bin_col_list = [], [], []
         train_list, val_list = [], []
         label_cnt = 0
@@ -230,7 +221,7 @@ class LoadTaskSingleData(DataLoader):
         super().__init__(**kwargs)
         self.encode_cat=False
 
-    def process_data(self):
+    def run(self):
         df = self.read_file(self.task_data_path)
 
         # Delete the sample whose label count is 1 or label is nan
