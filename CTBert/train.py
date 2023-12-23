@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 from tqdm.autonotebook import trange
 from . import constants
-from .evaluator import get_eval_metric_fn, EarlyStopping
+from .evaluator import Evaluator
 from .trainer_utils import SupervisedTrainCollator, TrainDataset
 import logging
 import deepspeed
@@ -23,6 +23,48 @@ from transformers.optimization import (
     get_constant_schedule,
     get_constant_schedule_with_warmup
 )
+
+class EarlyStopping:
+    def __init__(self, patience=7, verbose=False, delta=0, output_dir='ckpt', trace_func=print, less_is_better=False):
+        self.patience = patience
+        self.verbose = verbose
+        self.counter = 0
+        self.best_score = None
+        self.early_stop = False
+        self.val_loss_min = np.Inf
+        self.delta = delta
+        self.path = output_dir
+        self.trace_func = trace_func
+        self.less_is_better = less_is_better
+
+    def __call__(self, val_loss, model):
+        if self.patience < 0: # no early stop
+            self.early_stop = False
+            return
+        
+        if self.less_is_better:
+            score = val_loss
+        else:    
+            score = -val_loss
+        if self.best_score is None:
+            self.best_score = score
+            self.save_checkpoint(val_loss, model)
+        elif score < self.best_score + self.delta:
+            self.counter += 1
+            self.trace_func(f'EarlyStopping counter: {self.counter} out of {self.patience}')
+            if self.counter >= self.patience:
+                self.early_stop = True
+        else:
+            self.best_score = score
+            self.save_checkpoint(val_loss, model)
+            self.counter = 0
+
+    def save_checkpoint(self, val_loss, model):
+        '''Saves model when validation loss decrease.'''
+        if self.verbose:
+            self.trace_func(f'Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}).  Saving model ...')
+        torch.save(model.state_dict(), os.path.join(self.path, constants.WEIGHTS_NAME))
+        self.val_loss_min = val_loss
 
 class BaseTrainer:
     def __init__(self, model, train_set_list, test_set_list=None, regression_task=False, collate_fn=None, output_dir='./ckpt', 
@@ -44,7 +86,7 @@ class BaseTrainer:
         self.warmup_steps = warmup_steps
         self.balance_sample = balance_sample
         self.load_best_at_last = load_best_at_last
-        self.eval_metric = get_eval_metric_fn(eval_metric)
+        self.evaluator = Evaluator()
         self.eval_metric_name = eval_metric
         self.eval_less_is_better = eval_less_is_better
         self.flag = flag
@@ -67,26 +109,25 @@ class BaseTrainer:
         self.lr_scheduler = None
 
         self.args = {
-            'num_epoch': num_epoch,
-            'batch_size': batch_size,
-            'eval_batch_size': eval_batch_size,
-            'lr': lr,
-            'weight_decay':weight_decay,
-            'patience':patience,
-            'warmup_ratio':warmup_ratio,
-            'warmup_steps':warmup_steps,
-            'eval_metric': get_eval_metric_fn(eval_metric),
-            'output_dir':output_dir,
-            'collate_fn':collate_fn,
-            'num_workers':num_workers,
-            'balance_sample':balance_sample,
-            'load_best_at_last':load_best_at_last,
-            'ignore_duplicate_cols':ignore_duplicate_cols,
-            'eval_less_is_better':eval_less_is_better,
-            'flag':flag,
-            'num_training_steps': self.get_num_train_steps(),
-            'regression_task':regression_task,
-            'device':device,
+            'num_epoch': self.num_epoch,
+            'batch_size': self.batch_size,
+            'eval_batch_size': self.eval_batch_size,
+            'lr': self.lr,
+            'weight_decay':self.weight_decay,
+            'patience':self.patience,
+            'warmup_ratio':self.warmup_ratio,
+            'warmup_steps':self.warmup_steps,
+            'output_dir':self.output_dir,
+            'collate_fn':self.collate_fn,
+            'num_workers':self.num_workers,
+            'balance_sample':self.balance_sample,
+            'load_best_at_last':self.load_best_at_last,
+            'ignore_duplicate_cols':self.ignore_duplicate_cols,
+            'eval_less_is_better':self.eval_less_is_better,
+            'flag':self.flag,
+            'num_training_steps': self.num_training_steps,
+            'regression_task':self.regression_task,
+            'device':self.device,
             'eval_metric_name': self.eval_metric_name
         }
 
@@ -249,10 +290,9 @@ class BaseTrainer:
             else:
                 y_test = pd.concat(y_test, 0)
                 if self.regression_task:
-                    eval_res = self.args['eval_metric'](y_test, pred_all)
+                    eval_res = self.evaluator.get_eval_metric_fn(self.eval_metric_name)(y_test, pred_all)
                 else:
-                    eval_res = self.args['eval_metric'](y_test, pred_all, self.model.num_class)
-
+                    eval_res = self.evaluator.get_eval_metric_fn(self.eval_metric_name)(y_test, pred_all, self.model.num_class)
             eval_res_list.append(eval_res)
         return eval_res_list
     

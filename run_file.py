@@ -9,6 +9,7 @@ import pandas as pd
 from sklearn.model_selection import StratifiedKFold
 from CTBert.data_loader import DataLoader
 from CTBert.train import BaseTrainer
+from CTBert.evaluator import Evaluator
 from sklearn.model_selection import train_test_split
 import shutil
 import numpy as np
@@ -28,6 +29,7 @@ class BaseRunFile:
         self.task_type = args.task_type
         self.model_type = args.model_type
         self.random_seed(42)
+        self.evaluator = Evaluator()
         warnings.filterwarnings("ignore")    
 
     def create_run_file(self):
@@ -310,8 +312,8 @@ class Finetune(BaseRunFile):
                 trainer = BaseTrainer(model, (X_train, y_train), (X_val, y_val), **self.training_arguments)
                 trainer.create_trainer()
                 
-                ypred = CTBert.predict(model, X_test)
-                ans = CTBert.evaluate(ypred, y_test, metric='auc', num_class=num_class)
+                ypred = self.evaluator.predict(model, X_test)
+                ans = self.evaluator.evaluate(ypred, y_test, metric='auc', num_class=num_class)
                 score_list.append(ans[0])
                 logging.info(f'Test_Score_{idd}===>{task}_DataSet==> {ans[0]}')
             all_res[task] = np.mean(score_list)
@@ -388,8 +390,8 @@ class Scratch(BaseRunFile):
                 trainer = BaseTrainer(model, (X_train, y_train), (X_val, y_val), **self.training_arguments)
                 trainer.create_trainer()
                 
-                ypred = CTBert.predict(model, X_test)
-                ans = CTBert.evaluate(ypred, y_test, metric='auc', num_class=num_class)
+                ypred = self.evaluator.predict(model, X_test)
+                ans = self.evaluator.evaluate(ypred, y_test, metric='auc', num_class=num_class)
                 score_list.append(ans[0])
                 logging.info(f'Test_Score_{idd}===>{task}_DataSet==> {ans[0]}')
             all_res[task] = np.mean(score_list)

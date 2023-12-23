@@ -4,8 +4,6 @@ import math
 import collections
 import json
 from typing import Dict, Optional, Any, Union, Callable, List
-
-from loguru import logger
 from transformers import BertTokenizer, BertTokenizerFast, AutoTokenizer
 import torch
 from torch import nn
@@ -14,6 +12,7 @@ import torch.nn.init as nn_init
 import torch.nn.functional as F
 import numpy as np
 import pandas as pd
+import logging
 
 from . import constants
 dev = 'cuda'
@@ -218,7 +217,7 @@ class CTBertFeatureExtractor:
         self.categorical_columns = col_type_dict['categorical']
         self.numerical_columns = col_type_dict['numerical']
         self.binary_columns = col_type_dict['binary']
-        logger.info(f'load feature extractor from {coltype_path}')
+        logging.info(f'load feature extractor from {coltype_path}')
 
     def update(self, cat=None, num=None, bin=None):
         '''update cat/num/bin column maps.
@@ -240,7 +239,7 @@ class CTBertFeatureExtractor:
         if bin_cols is not None: all_cols.extend(bin_cols)
         org_length = len(all_cols)
         if org_length == 0:
-            logger.warning('No cat/num/bin cols specified, will take ALL columns as categorical! Ignore this warning if you specify the `checkpoint` to load the model.')
+            logging.warning('No cat/num/bin cols specified, will take ALL columns as categorical! Ignore this warning if you specify the `checkpoint` to load the model.')
             return True, []
         unq_length = len(list(set(all_cols)))
         duplicate_cols = [item for item, count in collections.Counter(all_cols).items() if count > 1]
@@ -248,7 +247,7 @@ class CTBertFeatureExtractor:
 
     def _solve_duplicate_cols(self, duplicate_cols):
         for col in duplicate_cols:
-            logger.warning('Find duplicate cols named `{col}`, will ignore it during training!')
+            logging.warning('Find duplicate cols named `{col}`, will ignore it during training!')
             if col in self.categorical_columns:
                 self.categorical_columns.remove(col)
                 self.categorical_columns.append(f'[cat]{col}')
@@ -594,9 +593,9 @@ class CTBertInputEncoder(nn.Module):
         model_name = os.path.join(ckpt_dir, constants.INPUT_ENCODER_NAME)
         state_dict = torch.load(model_name, map_location='cpu')
         missing_keys, unexpected_keys = self.load_state_dict(state_dict, strict=False)
-        logger.info(f'missing keys: {missing_keys}')
-        logger.info(f'unexpected keys: {unexpected_keys}')
-        logger.info(f'load model from {ckpt_dir}')
+        logging.info(f'missing keys: {missing_keys}')
+        logging.info(f'unexpected keys: {unexpected_keys}')
+        logging.info(f'load model from {ckpt_dir}')
 
 class CTBertEncoder(nn.Module):
     def __init__(self,
@@ -795,9 +794,9 @@ class CTBertModel(nn.Module):
         model_name = os.path.join(ckpt_dir, constants.WEIGHTS_NAME)
         state_dict = torch.load(model_name, map_location='cpu')
         missing_keys, unexpected_keys = self.load_state_dict(state_dict, strict=False)
-        logger.info(f'missing keys: {missing_keys}')
-        logger.info(f'unexpected keys: {unexpected_keys}')
-        logger.info(f'load model from {ckpt_dir}')
+        logging.info(f'missing keys: {missing_keys}')
+        logging.info(f'unexpected keys: {unexpected_keys}')
+        logging.info(f'load model from {ckpt_dir}')
 
         # load feature extractor
         self.input_encoder.feature_extractor.load(os.path.join(ckpt_dir, constants.EXTRACTOR_STATE_DIR))
@@ -832,7 +831,7 @@ class CTBertModel(nn.Module):
             num_class = config['num_class']
             self.clf = CTBertLinearClassifier(num_class, hidden_dim=self.cls_token.hidden_dim)
             self.clf.to(self.device)
-            logger.info(f'Build a new classifier with num {num_class} classes outputs, need further finetune to work.')
+            logging.info(f'Build a new classifier with num {num_class} classes outputs, need further finetune to work.')
 
         return None
 
@@ -848,7 +847,7 @@ class CTBertModel(nn.Module):
 
     def _solve_duplicate_cols(self, duplicate_cols):
         for col in duplicate_cols:
-            logger.warning('Find duplicate cols named `{col}`, will ignore it during training!')
+            logging.warning('Find duplicate cols named `{col}`, will ignore it during training!')
             if col in self.categorical_columns:
                 self.categorical_columns.remove(col)
                 self.categorical_columns.append(f'[cat]{col}')
