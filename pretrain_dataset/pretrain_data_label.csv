@@ -1,4 +1,0 @@
-﻿id_openml,name,file_name,version,train_rows,train_cols,num_numeric,num_disperse,num_missvalue,target,mode
-54,vehicle,0032_vehicle.csv,1,846,19,18,1,0,class,classify
-210,cloud,cloud.csv,1,108,7,5,2,0,TE,regression
-1049,pc4,0505_pc4.csv,1,1458,38,37,1,0,c,classify

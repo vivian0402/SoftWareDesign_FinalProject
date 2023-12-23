@@ -8,10 +8,13 @@ import warnings
 import pandas as pd
 from sklearn.model_selection import StratifiedKFold
 from CTBert.data_loader import DataLoader
+from CTBert.train import BaseTrainer
 from sklearn.model_selection import train_test_split
 import shutil
 import numpy as np
 import deepspeed
+import random
+import torch
 
 class BaseRunFile:
     def __init__(self, args):
@@ -24,7 +27,7 @@ class BaseRunFile:
         self.checkpoint_save = f'./save_info/temp_models/{self.args.checkpoint_save}'
         self.task_type = args.task_type
         self.model_type = args.model_type
-        CTBert.random_seed(42)
+        self.random_seed(42)
         warnings.filterwarnings("ignore")    
 
     def create_run_file(self):
@@ -54,6 +57,12 @@ class BaseRunFile:
         fh = logging.FileHandler(exp_log_dir / 'log.txt')
         fh.setFormatter(logging.Formatter(log_format))
         logging.getLogger().addHandler(fh)
+    
+    def random_seed(self, seed):
+        os.environ['PYTHONHASHSEED'] = str(seed)
+        random.seed(seed)
+        np.random.seed(seed)
+        torch.manual_seed(seed)
 
 class PretrainCLDeepSeed(BaseRunFile):
     def __init__(self, args):
@@ -110,7 +119,8 @@ class PretrainCLDeepSeed(BaseRunFile):
         logging.info(self.training_arguments)
         if os.path.isdir(self.training_arguments['output_dir']):
             shutil.rmtree(self.training_arguments['output_dir'])
-        CTBert.train(model, trainset, valset, collate_fn=collate_fn, use_deepspeed=False, **self.training_arguments)
+        trainer = BaseTrainer(model, trainset, valset, collate_fn=collate_fn, use_deepspeed=False, **self.training_arguments)
+        trainer.create_trainer()
 
 class PretrainMaskDeepSeed(BaseRunFile):
     def __init__(self, args):
@@ -175,8 +185,9 @@ class PretrainMaskDeepSeed(BaseRunFile):
         )
 
         logging.info(self.training_arguments)
-        CTBert.train(model, trainset, valset, use_deepspeed=True, cmd_args=self.args, **self.training_arguments)
-
+        trainer = BaseTrainer(model, trainset, valset, use_deepspeed=True, cmd_args=self.args, **self.training_arguments)
+        trainer.create_trainer()
+        
 class PretrainMask(BaseRunFile):
     def __init__(self, args):
         super().__init__(args)
@@ -229,8 +240,9 @@ class PretrainMask(BaseRunFile):
         logging.info(self.training_arguments)
         if os.path.isdir(self.training_arguments['output_dir']):
             shutil.rmtree(self.training_arguments['output_dir'])
-        CTBert.train(model, trainset, valset, use_deepspeed=False, **self.training_arguments)
-
+        trainer = BaseTrainer(model, trainset, valset, use_deepspeed=False, **self.training_arguments)
+        trainer.create_trainer()
+        
 class Finetune(BaseRunFile):
     def __init__(self, args):
         super().__init__(args)
@@ -273,7 +285,7 @@ class Finetune(BaseRunFile):
             idd = 0
             score_list = []
             for trn_idx, val_idx in self.skf.split(X, y):
-                CTBert.random_seed(42)
+                self.random_seed(42)
                 idd += 1
                 train_data = X.loc[trn_idx]
                 train_label = y[trn_idx]
@@ -295,8 +307,9 @@ class Finetune(BaseRunFile):
                 logging.info(self.training_arguments)
                 if os.path.isdir(self.training_arguments['output_dir']):
                     shutil.rmtree(self.training_arguments['output_dir'])
-                CTBert.train(model, (X_train, y_train), (X_val, y_val), **self.training_arguments)
-
+                trainer = BaseTrainer(model, (X_train, y_train), (X_val, y_val), **self.training_arguments)
+                trainer.create_trainer()
+                
                 ypred = CTBert.predict(model, X_test)
                 ans = CTBert.evaluate(ypred, y_test, metric='auc', num_class=num_class)
                 score_list.append(ans[0])
@@ -352,7 +365,7 @@ class Scratch(BaseRunFile):
             idd = 0
             score_list = []
             for trn_idx, val_idx in self.skf.split(X, y):
-                CTBert.random_seed(42)
+                self.random_seed(42)
                 idd += 1
                 train_data = X.loc[trn_idx]
                 train_label = y[trn_idx]
@@ -372,8 +385,9 @@ class Scratch(BaseRunFile):
                 logging.info(self.training_arguments)
                 if os.path.isdir(self.training_arguments['output_dir']):
                     shutil.rmtree(self.training_arguments['output_dir'])
-                CTBert.train(model, (X_train, y_train), (X_val, y_val), **self.training_arguments)
-
+                trainer = BaseTrainer(model, (X_train, y_train), (X_val, y_val), **self.training_arguments)
+                trainer.create_trainer()
+                
                 ypred = CTBert.predict(model, X_test)
                 ans = CTBert.evaluate(ypred, y_test, metric='auc', num_class=num_class)
                 score_list.append(ans[0])
