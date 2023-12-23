@@ -5,272 +5,173 @@ from . import constants
 from .modeling_CTBert import CTBertClassifier, CTBertFeatureExtractor, CTBertFeatureProcessor, CTBertRegression
 from .modeling_CTBert import CTBertForCL, TableGPTForMask
 from .modeling_CTBert import CTBertInputEncoder, CTBertModel
+# from .evaluator import predict, evaluate
 from .trainer_utils import CTBertCollatorForCL
 from .data_loader import DataLoader
 
-dev = 'cuda'
-def build_classifier(
-    categorical_columns=None,
-    numerical_columns=None,
-    binary_columns=None,
-    feature_extractor=None,
-    num_class=2,
-    hidden_dim=128,
-    num_layer=2,
-    num_attention_head=8,
-    hidden_dropout_prob=0,
-    ffn_dim=256,
-    activation='relu',
-    vocab_freeze=False,
-    use_bert=True,
-    device=dev,
-    checkpoint=None,
-    **kwargs) -> CTBertClassifier:
-    '''Build a :class:`CTBert.modeling_CTBert.CTBertClassifier`.
+class BaseCTBertModel:
+    def __init__(self, **kwargs):
+        self.categorical_columns = kwargs.get('categorical_columns')
+        self.numerical_columns = kwargs.get('numerical_columns')
+        self.binary_columns = kwargs.get('binary_columns')
+        self.hidden_dim = kwargs.get('hidden_dim', 128)
+        self.num_layer = kwargs.get('num_layer', 2)
+        self.num_attention_head = kwargs.get('num_attention_head', 8)
+        self.hidden_dropout_prob = kwargs.get('hidden_dropout_prob', 0)
+        self.ffn_dim = kwargs.get('ffn_dim', 256)
+        self.activation = kwargs.get('activation', 'relu')
+        self.vocab_freeze = kwargs.get('vocab_freeze', False)
+        self.device = kwargs.get('device', 'cuda')
+        self.task_type = kwargs.get('task_type')
+        self.model_type = kwargs.get('model_type')
+        self.checkpoint = kwargs.get('checkpoint')
+        self.mlm_probability = kwargs.get('mlm_probability', 0.15)
+        self.projection_dim = kwargs.get('projection_dim', 128)
+        self.supervised = kwargs.get('supervised', False)
+        self.num_partition = kwargs.get('num_partition')
+        self.overlap_ratio = kwargs.get('overlap_ratio')
+        self.ignore_duplicate_cols = kwargs.get('ignore_duplicate_cols', True)
 
-    Parameters
-    ----------
-    categorical_columns: list 
-        a list of categorical feature names.
-
-    numerical_columns: list
-        a list of numerical feature names.
-
-    binary_columns: list
-        a list of binary feature names, accept binary indicators like (yes,no); (true,false); (0,1).
+    def load_model(self, model):
+        if self.checkpoint is not None:
+            model.load(self.checkpoint)
     
-    feature_extractor: CTBertFeatureExtractor
-        a feature extractor to tokenize the input tables. if not passed the model will build itself.
+    def create_model(self):
+        if self.task_type == 'pretrain_CL_ds':
+            model = BuildContrastiveLearner(**self.__dict__)
+        elif self.task_type == 'pretrain_mask_ds' or self.task_type == 'pretrain_mask':
+            model = BuildMaskFeaturesLearner(**self.__dict__)
+        elif self.task_type == 'fintune' or self.task_type == 'scratch':
+            if self.model_type == 'regression':
+                model = BuildRegression(**self.__dict__)
+            elif self.model_type == 'classify':
+                model = BuildClassifier(**self.__dict__)
+            else:
+                raise ValueError(f"Unknown model type: {self.model_type}")
+        else:
+            raise ValueError(f"Unknown task: {self.task_type}")
+        return model.build()
 
-    num_class: int
-        number of output classes to be predicted.
+class BuildClassifier(BaseCTBertModel):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.feature_extractor = kwargs.get('feature_extractor')
+        self.num_class = kwargs.get('num_class', 2)
+        self.use_bert = kwargs.get('use_bert', True)
 
-    hidden_dim: int
-        the dimension of hidden embeddings.
-    
-    num_layer: int
-        the number of transformer layers used in the encoder.
-    
-    num_attention_head: int
-        the numebr of heads of multihead self-attention layer in the transformers.
+    def build(self) -> CTBertClassifier:
+        model = CTBertClassifier(
+            categorical_columns = self.categorical_columns,
+            numerical_columns = self.numerical_columns,
+            binary_columns = self.binary_columns,
+            hidden_dim = self.hidden_dim,
+            num_layer = self.num_layer,
+            num_attention_head = self.num_attention_head,
+            hidden_dropout_prob = self.hidden_dropout_prob,
+            ffn_dim = self.ffn_dim,
+            activation = self.activation,
+            vocab_freeze = self.vocab_freeze,
+            device = self.device,
+            feature_extractor = self.feature_extractor,
+            num_class=self.num_class,
+            use_bert=self.use_bert
+        )
+        
+        self.load_model(model)
 
-    hidden_dropout_prob: float
-        the dropout ratio in the transformer encoder.
+        return model
 
-    ffn_dim: int
-        the dimension of feed-forward layer in the transformer layer.
-    
-    activation: str
-        the name of used activation functions, support ``"relu"``, ``"gelu"``, ``"selu"``, ``"leakyrelu"``.
-    
-    device: str
-        the device, ``"cpu"`` or ``"cuda:0"``.
-    
-    checkpoint: str
-        the directory to load the pretrained CTBert model.
+class BuildRegression(BaseCTBertModel):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.feature_extractor = kwargs.get('feature_extractor')
 
-    Returns
-    -------
-    A CTBertClassifier model.
+    def build(self) ->  CTBertRegression:
+        model =  CTBertRegression(
+            categorical_columns = self.categorical_columns,
+            numerical_columns = self.numerical_columns,
+            binary_columns = self.binary_columns,
+            hidden_dim = self.hidden_dim,
+            num_layer = self.num_layer,
+            num_attention_head = self.num_attention_head,
+            hidden_dropout_prob = self.hidden_dropout_prob,
+            ffn_dim = self.ffn_dim,
+            activation = self.activation,
+            vocab_freeze = self.vocab_freeze,
+            device = self.device,
+            feature_extractor = self.feature_extractor,
+            num_class=self.num_class,
+            use_bert=self.use_bert,
+        )
+        
+        self.load_model(model)
 
-    '''
-    model = CTBertClassifier(
-        categorical_columns = categorical_columns,
-        numerical_columns = numerical_columns,
-        binary_columns = binary_columns,
-        feature_extractor = feature_extractor,
-        num_class=num_class,
-        hidden_dim=hidden_dim,
-        num_layer=num_layer,
-        num_attention_head=num_attention_head,
-        hidden_dropout_prob=hidden_dropout_prob,
-        ffn_dim=ffn_dim,
-        activation=activation,
-        vocab_freeze=vocab_freeze,
-        use_bert=use_bert,
-        device=device,
-        **kwargs,
-    )
-    
-    if checkpoint is not None:
-        model.load(checkpoint)
+        return model
 
-    return model
+class BuildContrastiveLearner(BaseCTBertModel):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.projection_dim = kwargs.get('projection_dim')
+        self.num_partition = kwargs.get('num_partition')
+        self.overlap_ratio = kwargs.get('overlap_ratio')
+        self.supervised = kwargs.get('supervised')
+        self.ignore_duplicate_cols = kwargs.get('ignore_duplicate_cols')
 
+    def build(self): 
+        model = CTBertForCL(
+            categorical_columns = self.categorical_columns,
+            numerical_columns = self.numerical_columns,
+            binary_columns = self.binary_columns,
+            hidden_dim = self.hidden_dim,
+            num_layer = self.num_layer,
+            num_attention_head = self.num_attention_head,
+            hidden_dropout_prob = self.hidden_dropout_prob,
+            ffn_dim = self.ffn_dim,
+            activation = self.activation,
+            vocab_freeze = self.vocab_freeze,
+            device = self.device,
+            num_partition= self.num_partition,
+            supervised=self.supervised,
+            projection_dim=self.projection_dim,
+            overlap_ratio=self.overlap_ratio,
+        )
 
-def build_regression(
-    categorical_columns=None,
-    numerical_columns=None,
-    binary_columns=None,
-    feature_extractor=None,
-    hidden_dim=128,
-    num_layer=2,
-    num_attention_head=8,
-    hidden_dropout_prob=0,
-    ffn_dim=256,
-    activation='relu',
-    vocab_freeze=False,
-    device=dev,
-    checkpoint=None,
-    **kwargs) ->  CTBertRegression:
-    '''Build a :class:`CTBert.modeling_CTBert.CTBertClassifier`.
+        # build collate function for contrastive learning
+        collate_fn = CTBertCollatorForCL(
+            categorical_columns=self.categorical_columns,
+            numerical_columns=self.numerical_columns,
+            binary_columns=self.binary_columns,
+            overlap_ratio=self.overlap_ratio,
+            num_partition=self.num_partition,
+            ignore_duplicate_cols=self.ignore_duplicate_cols
+        )
 
-    Parameters
-    ----------
-    categorical_columns: list 
-        a list of categorical feature names.
+        if self.checkpoint is not None:
+            collate_fn.feature_extractor.load(os.path.join(self.checkpoint, constants.EXTRACTOR_STATE_DIR))
 
-    numerical_columns: list
-        a list of numerical feature names.
+        return model, collate_fn
 
-    binary_columns: list
-        a list of binary feature names, accept binary indicators like (yes,no); (true,false); (0,1).
-    
-    feature_extractor: CTBertFeatureExtractor
-        a feature extractor to tokenize the input tables. if not passed the model will build itself.
+class BuildMaskFeaturesLearner(BaseCTBertModel):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
-    num_class: int
-        number of output classes to be predicted.
+    def build(self): 
+        model = TableGPTForMask(
+            categorical_columns = self.categorical_columns,
+            numerical_columns = self.numerical_columns,
+            binary_columns = self.binary_columns,
+            hidden_dim = self.hidden_dim,
+            num_layer = self.num_layer,
+            num_attention_head = self.num_attention_head,
+            hidden_dropout_prob = self.hidden_dropout_prob,
+            ffn_dim = self.ffn_dim,
+            activation = self.activation,
+            vocab_freeze = self.vocab_freeze,
+            device = self.device,
+            mlm_probability=self.mlm_probability,
+            projection_dim=self.projection_dim,
+        )
 
-    hidden_dim: int
-        the dimension of hidden embeddings.
-    
-    num_layer: int
-        the number of transformer layers used in the encoder.
-    
-    num_attention_head: int
-        the numebr of heads of multihead self-attention layer in the transformers.
+        self.load_model(model)
 
-    hidden_dropout_prob: float
-        the dropout ratio in the transformer encoder.
-
-    ffn_dim: int
-        the dimension of feed-forward layer in the transformer layer.
-    
-    activation: str
-        the name of used activation functions, support ``"relu"``, ``"gelu"``, ``"selu"``, ``"leakyrelu"``.
-    
-    device: str
-        the device, ``"cpu"`` or ``"cuda:0"``.
-    
-    checkpoint: str
-        the directory to load the pretrained CTBert model.
-
-    Returns
-    -------
-    A CTBertClassifier model.
-
-    '''
-    model =  CTBertRegression(
-        categorical_columns = categorical_columns,
-        numerical_columns = numerical_columns,
-        binary_columns = binary_columns,
-        feature_extractor = feature_extractor,
-        hidden_dim=hidden_dim,
-        num_layer=num_layer,
-        num_attention_head=num_attention_head,
-        hidden_dropout_prob=hidden_dropout_prob,
-        ffn_dim=ffn_dim,
-        activation=activation,
-        vocab_freeze=vocab_freeze,
-        device=device,
-        **kwargs,
-    )
-    
-    if checkpoint is not None:
-        model.load(checkpoint)
-
-    return model
-
-
-def build_contrastive_learner(
-    categorical_columns=None,
-    numerical_columns=None,
-    binary_columns=None,
-    projection_dim=128,
-    num_partition=3,
-    overlap_ratio=0.5,
-    supervised=True,
-    hidden_dim=128,
-    num_layer=2,
-    num_attention_head=8,
-    hidden_dropout_prob=0,
-    ffn_dim=256,
-    activation='relu',
-    device=dev,
-    checkpoint=None,
-    ignore_duplicate_cols=True,
-    vocab_freeze=True,
-    **kwargs,
-    ): 
-    model = CTBertForCL(
-        categorical_columns = categorical_columns,
-        numerical_columns = numerical_columns,
-        binary_columns = binary_columns,
-        num_partition= num_partition,
-        hidden_dim=hidden_dim,
-        num_layer=num_layer,
-        num_attention_head=num_attention_head,
-        hidden_dropout_prob=hidden_dropout_prob,
-        supervised=supervised,
-        ffn_dim=ffn_dim,
-        projection_dim=projection_dim,
-        overlap_ratio=overlap_ratio,
-        activation=activation,
-        vocab_freeze=vocab_freeze,
-        device=device,
-    )
-    if checkpoint is not None:
-        model.load(checkpoint)
-    
-    # build collate function for contrastive learning
-    collate_fn = CTBertCollatorForCL(
-        categorical_columns=categorical_columns,
-        numerical_columns=numerical_columns,
-        binary_columns=binary_columns,
-        overlap_ratio=overlap_ratio,
-        num_partition=num_partition,
-        ignore_duplicate_cols=ignore_duplicate_cols
-    )
-    if checkpoint is not None:
-        collate_fn.feature_extractor.load(os.path.join(checkpoint, constants.EXTRACTOR_STATE_DIR))
-
-    return model, collate_fn
-
-
-def build_mask_features_learner(
-    categorical_columns=None,
-    numerical_columns=None,
-    binary_columns=None,
-    mlm_probability=0.15,
-    projection_dim=128,
-    hidden_dim=128,
-    num_layer=2,
-    num_attention_head=8,
-    hidden_dropout_prob=0,
-    ffn_dim=256,
-    activation='relu',
-    vocab_freeze=True,
-    device=dev,
-    checkpoint=None,
-    **kwargs,
-    ): 
-    model = TableGPTForMask(
-        categorical_columns = categorical_columns,
-        numerical_columns = numerical_columns,
-        binary_columns = binary_columns,
-        mlm_probability=mlm_probability,
-        hidden_dim=hidden_dim,
-        num_layer=num_layer,
-        num_attention_head=num_attention_head,
-        hidden_dropout_prob=hidden_dropout_prob,
-        ffn_dim=ffn_dim,
-        projection_dim=projection_dim,
-        activation=activation,
-        vocab_freeze=vocab_freeze,
-        device=device,
-    )
-    if checkpoint is not None:
-        model.load(checkpoint)
-
-    return model
+        return model

@@ -10,6 +10,7 @@ from sklearn.model_selection import StratifiedKFold
 from CTBert.data_loader import DataLoader
 from CTBert.train import BaseTrainer
 from CTBert.evaluator import Evaluator
+from CTBert .CTBert import BaseCTBertModel
 from sklearn.model_selection import train_test_split
 import shutil
 import numpy as np
@@ -69,17 +70,11 @@ class BaseRunFile:
 class PretrainCLDeepSeed(BaseRunFile):
     def __init__(self, args):
         super().__init__(args)
-        self.model_arg = {
-            'num_partition' : 2,
-            'overlap_ratio' : 0.5,
-            'num_attention_head' : self.args.num_attention_head,
-            'num_layer' : self.args.num_layer,
-        }
         self.training_arguments = {
             'num_epoch': self.args.num_epoch,
             'batch_size':self.args.batch_size,
             'lr':self.args.lr,
-            'eval_metric':self.args.eval_metric,
+            'eval_metric_name':self.args.eval_metric,
             'eval_less_is_better':True,
             'output_dir':self.checkpoint_save,
             'patience':self.args.patience,
@@ -104,19 +99,26 @@ class PretrainCLDeepSeed(BaseRunFile):
                 print(f"An error occurred while loading data: {e}")
                 return
 
-        logging.info(self.model_arg)
-
-        model, collate_fn = CTBert.build_contrastive_learner(
-            cat_cols, num_cols, bin_cols,
-            supervised=False,
-            num_partition=self.model_arg['num_partition'],
-            overlap_ratio=self.model_arg['overlap_ratio'],
-            device=self.device,
-            hidden_dropout_prob=self.args.hidden_dropout_prob,
-            num_attention_head=self.args.num_attention_head,
-            num_layer=self.args.num_layer,
-            vocab_freeze=True
-        )
+        self.model_params = {
+            'categorical_columns': cat_cols,
+            'numerical_columns': num_cols,
+            'binary_columns': bin_cols,
+            'device': self.device,
+            'hidden_dropout_prob': self.args.hidden_dropout_prob,
+            'num_layer': self.args.num_layer,
+            'vocab_freeze': True,
+            'task_type': self.args.task_type,
+            'model_type': self.args.model_type,
+            'num_attention_head':self.args.num_attention_head,
+            'projection_dim':128,
+            'supervised':False,
+            'num_partition':2,
+            'overlap_ratio':0.5,
+            'ignore_duplicate_cols':True
+        }
+        logging.info(self.model_params)
+        model= BaseCTBertModel(**self.model_params)
+        model, collate_fn = model.create_model()
 
         logging.info(self.training_arguments)
         if os.path.isdir(self.training_arguments['output_dir']):
@@ -127,16 +129,11 @@ class PretrainCLDeepSeed(BaseRunFile):
 class PretrainMaskDeepSeed(BaseRunFile):
     def __init__(self, args):
         super().__init__(args)
-        self.model_arg = {
-            'mlm_probability' : self.args.mlm_probability,
-            'num_attention_head' : self.args.num_attention_head,
-            'num_layer' : self.args.num_layer,
-        }
         self.training_arguments = {
             'num_epoch': self.args.num_epoch,
             'batch_size':self.args.batch_size,
             'lr':self.args.lr,
-            'eval_metric':'val_loss',
+            'eval_metric_name':'val_loss',
             'eval_less_is_better':True,
             'output_dir':self.checkpoint_save,
             'patience':self.args.patience,
@@ -174,17 +171,23 @@ class PretrainMaskDeepSeed(BaseRunFile):
             except Exception as e:
                 print(f"An error occurred while loading data: {e}")
         
-        logging.info(self.model_arg)
-
-        model = CTBert.build_mask_features_learner(
-            cat_cols, num_cols, bin_cols,
-            mlm_probability=self.args.mlm_probability,
-            device=self.device,
-            hidden_dropout_prob=self.args.hidden_dropout_prob,
-            num_attention_head=self.args.num_attention_head,
-            num_layer=self.args.num_layer,
-            vocab_freeze=True,
-        )
+        self.model_params = {
+            'categorical_columns': cat_cols,
+            'numerical_columns': num_cols,
+            'binary_columns': bin_cols,
+            'device': self.device,
+            'mlm_probability':self.args.mlm_probability,
+            'hidden_dropout_prob': self.args.hidden_dropout_prob,
+            'num_layer': self.args.num_layer,
+            'vocab_freeze': True,
+            'task_type': self.args.task_type,
+            'model_type': self.args.model_type,
+            'num_attention_head':self.args.num_attention_head,
+            'projection_dim':128
+        }
+        logging.info(self.model_params)
+        model = BaseCTBertModel(**self.model_params)
+        model = model.create_model()
 
         logging.info(self.training_arguments)
         trainer = BaseTrainer(model, trainset, valset, use_deepspeed=True, cmd_args=self.args, **self.training_arguments)
@@ -193,16 +196,11 @@ class PretrainMaskDeepSeed(BaseRunFile):
 class PretrainMask(BaseRunFile):
     def __init__(self, args):
         super().__init__(args)
-        self.model_arg = {
-            'mlm_probability' : self.args.mlm_probability,
-            'num_attention_head' : self.args.num_attention_head,
-            'num_layer' : self.args.num_layer,
-        }
         self.training_arguments = {
             'num_epoch':self.args.num_epoch,
             'batch_size':self.args.batch_size,
             'lr':self.args.lr,
-            'eval_metric':self.args.eval_metric,
+            'eval_metric_name':self.args.eval_metric,
             'eval_less_is_better':True,
             'output_dir':self.checkpoint_save,
             'device':self.device,
@@ -227,17 +225,23 @@ class PretrainMask(BaseRunFile):
             except Exception as e:
                 print(f"An error occurred while loading data: {e}")
                 
-        logging.info(self.model_arg)
-
-        model = CTBert.build_mask_features_learner(
-            cat_cols, num_cols, bin_cols,
-            mlm_probability=self.args.mlm_probability,
-            device=self.device,
-            hidden_dropout_prob=self.args.hidden_dropout_prob,
-            num_attention_head=self.args.num_attention_head,
-            num_layer=self.args.num_layer,
-            vocab_freeze=True,
-        )
+        self.model_params = {
+            'categorical_columns': cat_cols,
+            'numerical_columns': num_cols,
+            'binary_columns': bin_cols,
+            'device': self.device,
+            'mlm_probability':self.args.mlm_probability,
+            'hidden_dropout_prob': self.args.hidden_dropout_prob,
+            'num_layer': self.args.num_layer,
+            'vocab_freeze': True,
+            'task_type': self.args.task_type,
+            'model_type': self.args.model_type,
+            'num_attention_head':self.args.num_attention_head,
+            'projection_dim':128
+        }
+        logging.info(self.model_params)
+        model = BaseCTBertModel(**self.model_params)
+        model = model.create_model()
 
         logging.info(self.training_arguments)
         if os.path.isdir(self.training_arguments['output_dir']):
@@ -248,11 +252,12 @@ class PretrainMask(BaseRunFile):
 class Finetune(BaseRunFile):
     def __init__(self, args):
         super().__init__(args)
+        
         self.training_arguments = {
             'num_epoch':self.args.num_epoch,
             'batch_size':self.args.batch_size,
             'lr':self.args.lr,
-            'eval_metric':self.args.eval_metric,
+            'eval_metric_name':self.args.eval_metric,
             'eval_less_is_better':False,
             'output_dir':self.checkpoint_save,
             'patience':self.args.patience,
@@ -294,15 +299,23 @@ class Finetune(BaseRunFile):
                 X_test = X.loc[val_idx]
                 y_test = y[val_idx]
                 X_train, X_val, y_train, y_val = train_test_split(train_data, train_label, test_size=0.2, random_state=0, stratify=train_label, shuffle=True)
-                model = CTBert.build_classifier(
-                    cat_cols, num_cols, bin_cols,
-                    checkpoint=self.args.checkpoint_load,
-                    device=self.device,
-                    num_class=num_class,
-                    num_layer=self.args.num_layer,
-                    hidden_dropout_prob=self.args.hidden_dropout_prob,
-                    vocab_freeze=True,
-                )
+                
+                self.model_params = {
+                    'categorical_columns': cat_cols,
+                    'numerical_columns': num_cols,
+                    'binary_columns': bin_cols,
+                    'checkpoint': self.args.checkpoint_load,
+                    'device': self.device,
+                    'num_class': num_class,
+                    'num_layer': self.args.num_layer,
+                    'hidden_dropout_prob': self.args.hidden_dropout_prob,
+                    'vocab_freeze': True,
+                    'task_type': self.args.task_type,
+                    'model_type': self.args.model_type,
+                }
+
+                model = BaseCTBertModel(**self.model_params)
+                model = model.create_model()
 
                 model.update({'cat':cat_cols, 'num':num_cols, 'bin':bin_cols})
                 
@@ -332,7 +345,7 @@ class Scratch(BaseRunFile):
             'num_epoch':self.args.num_epoch,
             'batch_size':self.args.batch_size,
             'lr':self.args.lr,
-            'eval_metric':self.args.eval_metric,
+            'eval_metric_name':self.args.eval_metric,
             'eval_less_is_better':False,
             'output_dir':self.checkpoint_save,
             'patience':self.args.patience,
@@ -374,15 +387,21 @@ class Scratch(BaseRunFile):
                 X_test = X.loc[val_idx]
                 y_test = y[val_idx]
                 X_train, X_val, y_train, y_val = train_test_split(train_data, train_label, test_size=0.2, random_state=0, stratify=train_label, shuffle=True)
-                model = CTBert.build_classifier(
-                    cat_cols, num_cols, bin_cols,
-                    device=self.device,
-                    num_class=num_class,
-                    num_layer=self.args.num_layer,
-                    hidden_dropout_prob=self.args.hidden_dropout_prob,
-                    vocab_freeze=True,
-                    use_bert=True,
-                )
+                self.model_params = {
+                    'categorical_columns': cat_cols,
+                    'numerical_columns': num_cols,
+                    'binary_columns': bin_cols,
+                    'device': self.device,
+                    'num_class': num_class,
+                    'num_layer': self.args.num_layer,
+                    'hidden_dropout_prob': self.args.hidden_dropout_prob,
+                    'vocab_freeze': True,
+                    'use_bert': True,
+                    'task_type': self.args.task_type,
+                    'model_type': self.args.model_type,
+                }
+                model = BaseCTBertModel(**self.model_params)
+                model = model.create_model()
                 
                 logging.info(self.training_arguments)
                 if os.path.isdir(self.training_arguments['output_dir']):

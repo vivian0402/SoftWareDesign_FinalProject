@@ -67,46 +67,43 @@ class EarlyStopping:
         self.val_loss_min = val_loss
 
 class BaseTrainer:
-    def __init__(self, model, train_set_list, test_set_list=None, regression_task=False, collate_fn=None, output_dir='./ckpt', 
-                 num_epoch=10, batch_size=64, lr=1e-4, weight_decay=0, patience=5, eval_batch_size=256, warmup_ratio=None, 
-                 warmup_steps=None, balance_sample=False, load_best_at_last=True, eval_metric='auc', eval_less_is_better=False, 
-                 flag=0, num_workers=0, device=None, use_deepspeed=False, ignore_duplicate_cols=True, **kwargs):
+    def __init__(self, model, train_set_list, test_set_list=None, collate_fn=None, use_deepspeed=False, **kwargs):
         self.model = model
         self.train_set_list = [train_set_list] if isinstance(train_set_list, tuple) else train_set_list
         self.test_set_list = [test_set_list] if isinstance(test_set_list, tuple) else test_set_list
-        self.regression_task = regression_task
-        self.output_dir = output_dir
-        self.num_epoch = num_epoch
-        self.batch_size = batch_size
-        self.lr = lr
-        self.weight_decay = weight_decay
-        self.patience = patience
-        self.eval_batch_size = eval_batch_size
-        self.warmup_ratio = warmup_ratio
-        self.warmup_steps = warmup_steps
-        self.balance_sample = balance_sample
-        self.load_best_at_last = load_best_at_last
-        self.evaluator = Evaluator()
-        self.eval_metric_name = eval_metric
-        self.eval_less_is_better = eval_less_is_better
-        self.flag = flag
-        self.num_workers = num_workers
-        self.device = device
         self.use_deepspeed = use_deepspeed
-        self.ignore_duplicate_cols = ignore_duplicate_cols
+
+        self.regression_task = kwargs.get('regression_task', False)
+        self.output_dir = kwargs.get('output_dir', './ckpt')
+        self.num_epoch = kwargs.get('num_epoch', 10)
+        self.batch_size = kwargs.get('batch_size', 64)
+        self.lr = kwargs.get('lr', 1e-4)
+        self.weight_decay = kwargs.get('weight_decay', 0)
+        self.patience = kwargs.get('patience', 5)
+        self.eval_batch_size = kwargs.get('eval_batch_size', 256)
+        self.warmup_ratio = kwargs.get('warmup_ratio', None)
+        self.warmup_steps = kwargs.get('warmup_steps', None)
+        self.balance_sample = kwargs.get('balance_sample', False)
+        self.load_best_at_last = kwargs.get('load_best_at_last', True)
+        self.eval_metric_name = kwargs.get('eval_metric_name', 'auc')
+        self.eval_less_is_better = kwargs.get('eval_less_is_better', False)
+        self.flag = kwargs.get('flag', 0)
+        self.num_workers = kwargs.get('num_workers', 0)
+        self.device = kwargs.get('device', None)
+        self.ignore_duplicate_cols = kwargs.get('ignore_duplicate_cols', True)
+        
+        self.optimizer = None
+        self.lr_scheduler = None
         self.collate_fn = collate_fn if collate_fn is not None else SupervisedTrainCollator(
-            categorical_columns=model.categorical_columns, numerical_columns=model.numerical_columns, binary_columns=model.binary_columns, ignore_duplicate_cols=ignore_duplicate_cols)
+            categorical_columns=model.categorical_columns, numerical_columns=model.numerical_columns, binary_columns=model.binary_columns, ignore_duplicate_cols=self.ignore_duplicate_cols)
         self.testloader_list = [
             self._build_dataloader((testset, index), self.eval_batch_size, collator=self.collate_fn, num_workers=self.num_workers, shuffle=False)
             for index, testset in enumerate(self.test_set_list)
         ] if self.test_set_list else None
-        # Additional kwargs
-        self.kwargs = kwargs
         self.early_stopping = EarlyStopping(output_dir=self.output_dir, patience=self.patience, verbose=False, less_is_better=self.eval_less_is_better)
         self.num_training_steps = self.get_num_train_steps()
-        # Initialize optimizer and scheduler
-        self.optimizer = None
-        self.lr_scheduler = None
+        self.evaluator = Evaluator()
+        self.kwargs = kwargs
 
         self.args = {
             'num_epoch': self.num_epoch,
@@ -280,7 +277,6 @@ class BaseTrainer:
                         pred_list.append(logits.sigmoid().detach().cpu().numpy())
                     else: # multi-class classification
                         pred_list.append(torch.softmax(logits,-1).detach().cpu().numpy())
-
             if len(pred_list)>0:
                 pred_all = np.concatenate(pred_list, 0)
                 if logits.shape[-1] == 1:
@@ -298,19 +294,10 @@ class BaseTrainer:
     
     def create_trainer(self):
         if self.use_deepspeed:
-            trainer = Trainer_ds(self.model, self.train_set_list, self.test_set_list, self.regression_task, self.collate_fn, 
-                                 self.output_dir, self.num_epoch, self.batch_size, self.lr, self.weight_decay, self.patience, 
-                                 self.eval_batch_size, self.warmup_ratio, self.warmup_steps, self.balance_sample, 
-                                 self.load_best_at_last, self.eval_metric_name, self.eval_less_is_better, self.flag, self.num_workers, self.device, 
-                                 self.use_deepspeed, self.ignore_duplicate_cols, **self.kwargs)
+            trainer = Trainer_ds(**self.__dict__)
         else:
-            trainer = Trainer(self.model, self.train_set_list, self.test_set_list, self.regression_task, self.collate_fn, self.output_dir, 
-                              self.num_epoch, self.batch_size, self.lr, self.weight_decay, self.patience, self.eval_batch_size, 
-                              self.warmup_ratio, self.warmup_steps, self.balance_sample, self.load_best_at_last, self.eval_metric_name,  
-                              self.eval_less_is_better, self.flag, self.num_workers, self.device, self.use_deepspeed, 
-                              self.ignore_duplicate_cols, **self.kwargs)
+            trainer = Trainer(**self.__dict__)
         return trainer.train()
-
 
 class Trainer(BaseTrainer):
     def __init__(self, *args, **kwargs):
