@@ -1,10 +1,10 @@
 import logging
-import os, pdb
+import os
 import math
 import collections
 import json
-from typing import Dict, Optional, Any, Union, Callable, List
-from transformers import BertTokenizer, BertTokenizerFast, AutoTokenizer
+from typing import Dict, Optional
+from transformers import BertTokenizerFast
 import torch
 from torch import nn
 from torch import Tensor
@@ -230,33 +230,6 @@ class CTBertFeatureExtractor:
 
         if bin is not None:
             self.binary_columns = bin
-
-
-    def _check_column_overlap(self, cat_cols=None, num_cols=None, bin_cols=None):
-        all_cols = []
-        if cat_cols is not None: all_cols.extend(cat_cols)
-        if num_cols is not None: all_cols.extend(num_cols)
-        if bin_cols is not None: all_cols.extend(bin_cols)
-        org_length = len(all_cols)
-        if org_length == 0:
-            logging.warning('No cat/num/bin cols specified, will take ALL columns as categorical! Ignore this warning if you specify the `checkpoint` to load the model.')
-            return True, []
-        unq_length = len(list(set(all_cols)))
-        duplicate_cols = [item for item, count in collections.Counter(all_cols).items() if count > 1]
-        return org_length == unq_length, duplicate_cols
-
-    def _solve_duplicate_cols(self, duplicate_cols):
-        for col in duplicate_cols:
-            logging.warning('Find duplicate cols named `{col}`, will ignore it during training!')
-            if col in self.categorical_columns:
-                self.categorical_columns.remove(col)
-                self.categorical_columns.append(f'[cat]{col}')
-            if col in self.numerical_columns:
-                self.numerical_columns.remove(col)
-                self.numerical_columns.append(f'[num]{col}')
-            if col in self.binary_columns:
-                self.binary_columns.remove(col)
-                self.binary_columns.append(f'[bin]{col}')
 
 class CTBertFeatureProcessor(nn.Module):
     def __init__(self,
@@ -834,30 +807,6 @@ class CTBertModel(nn.Module):
             logging.info(f'Build a new classifier with num {num_class} classes outputs, need further finetune to work.')
 
         return None
-
-    def _check_column_overlap(self, cat_cols=None, num_cols=None, bin_cols=None):
-        all_cols = []
-        if cat_cols is not None: all_cols.extend(cat_cols)
-        if num_cols is not None: all_cols.extend(num_cols)
-        if bin_cols is not None: all_cols.extend(bin_cols)
-        org_length = len(all_cols)
-        unq_length = len(list(set(all_cols)))
-        duplicate_cols = [item for item, count in collections.Counter(all_cols).items() if count > 1]
-        return org_length == unq_length, duplicate_cols
-
-    def _solve_duplicate_cols(self, duplicate_cols):
-        for col in duplicate_cols:
-            logging.warning('Find duplicate cols named `{col}`, will ignore it during training!')
-            if col in self.categorical_columns:
-                self.categorical_columns.remove(col)
-                self.categorical_columns.append(f'[cat]{col}')
-            if col in self.numerical_columns:
-                self.numerical_columns.remove(col)
-                self.numerical_columns.append(f'[num]{col}')
-            if col in self.binary_columns:
-                self.binary_columns.remove(col)
-                self.binary_columns.append(f'[bin]{col}')
-
 
 class CTBertClassifier(CTBertModel):
     def __init__(self,

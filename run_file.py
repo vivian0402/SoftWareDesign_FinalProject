@@ -3,7 +3,6 @@ import os
 import sys
 import time
 from pathlib import Path
-import CTBert
 import warnings
 import pandas as pd
 from sklearn.model_selection import StratifiedKFold
