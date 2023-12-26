@@ -3,6 +3,8 @@
 
 This task is to reconstruct the code. The original file source is: https://github.com/Grason-Lu/ct-bert
 
+Environment: linux
+
 ***You need to write the information of the input dataset in a CSV file."
 
 Execute command string example: $ python main.py -tt "pretrain_CL_ds" -mt "classify" -cs "checkpoint-pretrain-CL" -em "val_loss" -pld "/home/vivian/SoftwareDesign_FinalProject/pretrain_dataset/data_label" -nl 3 -nah 8 -hdp 0.2 -e 10 -b 256 -p 5 -lr 5e-5
